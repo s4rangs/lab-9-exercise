@@ -41,12 +41,50 @@ struct DynamicCamera {
         // collect statistics on the player position and velocity in (normalized, if you like)
         // window coordinates. Compute lookAhead distance in world coords, adjusting for
         // if the player is moving left or right.
+        camera.setCameraCenter(cameraUnadjustedCenter);
+
+        sf::Vector2f playerWindow = camera.worldToWindowPercent(trackedPosWorld);
+
+        float lookAheadDir = 0.f;
+
+        if (trackedVelocityWorld.x > 0.f) {
+            lookAheadDir = 1.f;
+        } else if (trackedVelocityWorld.x < 0.f) {
+            lookAheadDir= -1.f;
+        }
+
+        float targetLookahead = camera.windowPercentToWorldDist({lookAhead * lookAheadDir, 0.f}).x;
+
         // Now update lookAhead state using an EMA over its previous state and the lookAhead world
         // vector. Then determine if the player is in the dead zone, soft rejection zone, or hard
         // rejection zone. For each, perform EMA on the delta of the camera displacement (ignoring
         // lookahead) appropriately. Next,
+        float cameraLatPercentage = 0.f; // amount camera should move laterally as %
+
+        if (playerWindow.x < deadZoneX.min) {
+            if (playerWindow.x < softZoneX.min) {
+                cameraLatPercentage = playerWindow.x - softZoneX.min;
+            } else {
+                cameraLatPercentage = alpha * (playerWindow.x - deadZoneX.min);
+            }
+        } else if (playerWindow.x > deadZoneX.max) {
+            if (playerWindow.x > softZoneX.max) {
+                cameraLatPercentage = playerWindow.x - softZoneX.max;
+            } else {
+                cameraLatPercentage = alpha * (playerWindow.x - deadZoneX.max);
+            }
+        }
+
+        sf::Vector2f cameraDeltaWorld = camera.windowPercentToWorldDist({cameraLatPercentage, 0.f});
+
+        cameraUnadjustedCenter += cameraDeltaWorld;
+
+        lookaheadState += alpha * (targetLookahead - lookaheadState);
+
         // set the camera center by offsetting the cameraUnadjustedCenter, combining lookAhead.
+        camera.setCameraCenter(cameraUnadjustedCenter + sf::Vector2f{lookaheadState, 0.f});
         // Finally update cameraUnadjustedCenter, but without lookahead.
+
     }
 
     float alpha;  // alpha to use for damping of camera position, *as well as* for smoothing of
